@@ -1,0 +1,45 @@
+from services.recommender import get_recommendations
+from services.book_service import (
+  get_all_books,
+  get_book_by_id,
+  add_book,
+  delete_book,
+  update_book,
+  import_books,
+  export_books,
+  seed_books_from_dataset,
+)
+from services.user_service import (
+  get_user,
+  create_user,
+  save_preferences,
+  get_preferences,
+  get_read_history,
+  add_to_history,
+  save_grade,
+  get_stats,
+  get_active_users,
+  set_admin,
+)
+
+__all__ = [
+  "get_recommendations",
+  "get_all_books",
+  "get_book_by_id",
+  "add_book",
+  "delete_book",
+  "update_book",
+  "import_books",
+  "export_books",
+  "seed_books_from_dataset",
+  "get_user",
+  "create_user",
+  "save_preferences",
+  "get_preferences",
+  "get_read_history",
+  "add_to_history",
+  "save_grade",
+  "get_stats",
+  "get_active_users",
+  "set_admin",
+]
