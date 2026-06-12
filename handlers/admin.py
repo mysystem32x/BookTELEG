@@ -5,10 +5,15 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 
 from config import DATA_DIR
 from database.db import get_db
-from keyboards.admin_keyboards import users_picker_keyboard
+from keyboards.admin_keyboards import (
+  admin_menu_keyboard,
+  admin_user_picker_reply_keyboard,
+  admins_drop_keyboard,
+  REQUEST_CREATE_ADMIN,
+)
 from states.survey_states import AdminStates
 from services.book_service import add_book, delete_book, update_book, export_books, import_books
-from services.user_service import set_admin, get_stats, get_active_users, create_user
+from services.user_service import set_admin, get_stats, get_active_users, create_user, get_user
 
 router = Router()
 
@@ -177,20 +182,15 @@ async def process_update_value(message: Message, state: FSMContext):
 
 
 @router.message(Command("create_admin"))
-async def cmd_create_admin(message: Message, is_admin: bool):
+async def cmd_create_admin(message: Message, state: FSMContext, is_admin: bool):
   if not is_admin:
     await message.answer("⛔ Команда только для администраторов.")
     return
 
-  users = await get_active_users()
-  candidates = [user for user in users if not user["is_admin"]]
-  if not candidates:
-    await message.answer("Нет пользователей, которых можно назначить администратором.")
-    return
-
+  await state.set_state(AdminStates.pick_create_admin)
   await message.answer(
-    "👤 Выберите пользователя для назначения администратором:",
-    reply_markup=users_picker_keyboard(candidates[:30], "create"),
+    "👤 Нажмите кнопку ниже и выберите пользователя из списка Telegram:",
+    reply_markup=admin_user_picker_reply_keyboard("create"),
   )
 
 
@@ -201,17 +201,55 @@ async def cmd_drop_admin(message: Message, is_admin: bool):
     return
 
   users = await get_active_users()
-  candidates = [
+  admins = [
     user for user in users
     if user["is_admin"] and user["user_id"] != message.from_user.id
   ]
-  if not candidates:
-    await message.answer("Нет других администраторов для снятия прав.")
+  if not admins:
+    await message.answer("Нет других назначенных администраторов.")
     return
 
   await message.answer(
     "👤 Выберите администратора для снятия прав:",
-    reply_markup=users_picker_keyboard(candidates[:30], "drop"),
+    reply_markup=admins_drop_keyboard(admins[:30]),
+  )
+
+
+@router.message(AdminStates.pick_create_admin, F.text == "❌ Отмена")
+async def cancel_admin_user_pick(message: Message, state: FSMContext):
+  await state.clear()
+  await message.answer("❌ Действие отменено.", reply_markup=admin_menu_keyboard())
+
+
+@router.message(F.users_shared)
+async def process_admin_user_shared(message: Message, state: FSMContext, is_admin: bool):
+  if not is_admin:
+    return
+
+  current_state = await state.get_state()
+  if current_state != AdminStates.pick_create_admin.state:
+    return
+
+  shared = message.users_shared
+  if not shared or not shared.users:
+    await message.answer("Пользователь не выбран. Попробуйте снова.")
+    return
+
+  selected = shared.users[0]
+  user_id = selected.user_id
+  username = selected.username
+  request_id = shared.request_id
+
+  if request_id != REQUEST_CREATE_ADMIN:
+    return
+
+  await create_user(user_id, username, is_admin=True)
+  await set_admin(user_id, True)
+  name = f"@{username}" if username else str(user_id)
+  await state.clear()
+  await message.answer(
+    f"✅ Пользователь {name} назначен администратором.",
+    reply_markup=admin_menu_keyboard(),
   )
 
 
@@ -232,19 +270,24 @@ async def process_admin_user_pick(callback: CallbackQuery, is_admin: bool):
     await callback.answer()
     return
 
-  user_id = int(parts[2])
-
-  if action == "create":
-    await create_user(user_id, None, is_admin=True)
-    await set_admin(user_id, True)
-    await callback.message.edit_text(f"✅ Пользователь {user_id} назначен администратором.")
-  elif action == "drop":
-    await set_admin(user_id, False)
-    await callback.message.edit_text(f"✅ Права администратора сняты с {user_id}.")
-  else:
+  if action != "drop":
     await callback.answer()
     return
 
+  user_id = int(parts[2])
+  if user_id == callback.from_user.id:
+    await callback.answer("Нельзя снять права с самого себя.", show_alert=True)
+    return
+
+  target = await get_user(user_id)
+  if not target or not target["is_admin"]:
+    await callback.answer("Этот пользователь не является администратором.", show_alert=True)
+    return
+
+  await set_admin(user_id, False)
+  username = target.get("username")
+  name = f"@{username}" if username else str(user_id)
+  await callback.message.edit_text(f"✅ Права администратора сняты с {name}.")
   await callback.answer()
 
 

@@ -5,7 +5,7 @@ from aiogram.types import (
   InlineKeyboardButton,
 )
 
-from config import MOODS, MOOD_LABELS, INTERESTS
+from config import MOODS, MOOD_LABELS, RATING_PREFERENCES, BOOK_LENGTHS, INTERESTS
 from services.genre_service import get_genres, GENRES_PER_PAGE
 
 
@@ -62,6 +62,22 @@ def mood_keyboard():
   buttons = [
     [InlineKeyboardButton(text=MOOD_LABELS.get(mood, mood), callback_data=f"mood:{mood}")]
     for mood in MOODS
+  ]
+  return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def rating_keyboard():
+  buttons = [
+    [InlineKeyboardButton(text=text, callback_data=f"rating:{key}")]
+    for key, text in RATING_PREFERENCES.items()
+  ]
+  return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def length_keyboard():
+  buttons = [
+    [InlineKeyboardButton(text=text, callback_data=f"length:{key}")]
+    for key, text in BOOK_LENGTHS.items()
   ]
   return InlineKeyboardMarkup(inline_keyboard=buttons)
 

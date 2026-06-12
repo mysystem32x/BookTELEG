@@ -3,6 +3,7 @@ import random
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from config import BOOK_LENGTHS
 from services.book_service import get_all_books
 from services.genre_service import genre_matches, matched_genres
 
@@ -103,6 +104,8 @@ def _build_user_text(preferences):
   parts.extend(preferences.get("genres", []))
   parts.append(preferences.get("mood", ""))
   parts.extend(preferences.get("interests", []))
+  parts.append(preferences.get("book_length", ""))
+  parts.append(preferences.get("rating_pref", ""))
   return " ".join(parts)
 
 
@@ -124,6 +127,20 @@ def _passes_filters(book, preferences):
 
   mood = preferences.get("mood", "")
   if mood and book["mood"] != mood:
+    return False
+
+  rating_pref = preferences.get("rating_pref", "any")
+  if rating_pref == "hits" and book["rating"] < 4.0:
+    return False
+
+  length = preferences.get("book_length", "medium")
+  pages = book.get("pages", 300)
+
+  if length == "short" and pages > 200:
+    return False
+  if length == "medium" and (pages < 200 or pages > 400):
+    return False
+  if length == "long" and pages < 400:
     return False
 
   return True
@@ -149,6 +166,10 @@ def _build_reason(book, preferences, score, fallback_genre=None):
   common = set(interests) & set(book_interests)
   if common:
     reasons.append(f"общие интересы: {', '.join(common)}")
+
+  length = preferences.get("book_length", "")
+  if length:
+    reasons.append(f"объём подходит ({BOOK_LENGTHS.get(length, length)})")
 
   if book["rating"] >= 4.5:
     reasons.append(f"высокий рейтинг ({book['rating']})")
