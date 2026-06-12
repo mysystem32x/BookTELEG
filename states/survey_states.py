@@ -3,10 +3,6 @@ from aiogram.fsm.state import State, StatesGroup
 
 class SurveyStates(StatesGroup):
   genres = State()
-  mood = State()
-  rating = State()
-  length = State()
-  interests = State()
 
 
 class AdminStates(StatesGroup):
@@ -24,9 +20,6 @@ class AdminStates(StatesGroup):
   update_book_id = State()
   update_field = State()
   update_value = State()
-
-  create_admin_id = State()
-  drop_admin_id = State()
 
   import_file = State()
 

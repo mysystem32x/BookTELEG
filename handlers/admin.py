@@ -1,10 +1,11 @@
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile
 
 from config import DATA_DIR
 from database.db import get_db
+from keyboards.admin_keyboards import users_picker_keyboard
 from states.survey_states import AdminStates
 from services.book_service import add_book, delete_book, update_book, export_books, import_books
 from services.user_service import set_admin, get_stats, get_active_users, create_user
@@ -176,38 +177,75 @@ async def process_update_value(message: Message, state: FSMContext):
 
 
 @router.message(Command("create_admin"))
-async def cmd_create_admin(message: Message, state: FSMContext, is_admin: bool):
+async def cmd_create_admin(message: Message, is_admin: bool):
   if not is_admin:
     await message.answer("⛔ Команда только для администраторов.")
     return
-  await state.set_state(AdminStates.create_admin_id)
-  await message.answer("Введите Telegram ID нового администратора:")
 
+  users = await get_active_users()
+  candidates = [user for user in users if not user["is_admin"]]
+  if not candidates:
+    await message.answer("Нет пользователей, которых можно назначить администратором.")
+    return
 
-@router.message(AdminStates.create_admin_id)
-async def process_create_admin(message: Message, state: FSMContext):
-  user_id = int(message.text)
-  await create_user(user_id, None, is_admin=True)
-  await set_admin(user_id, True)
-  await state.clear()
-  await message.answer(f"✅ Пользователь {user_id} назначен администратором.")
+  await message.answer(
+    "👤 Выберите пользователя для назначения администратором:",
+    reply_markup=users_picker_keyboard(candidates[:30], "create"),
+  )
 
 
 @router.message(Command("drop_admin"))
-async def cmd_drop_admin(message: Message, state: FSMContext, is_admin: bool):
+async def cmd_drop_admin(message: Message, is_admin: bool):
   if not is_admin:
     await message.answer("⛔ Команда только для администраторов.")
     return
-  await state.set_state(AdminStates.drop_admin_id)
-  await message.answer("Введите Telegram ID администратора для снятия прав:")
+
+  users = await get_active_users()
+  candidates = [
+    user for user in users
+    if user["is_admin"] and user["user_id"] != message.from_user.id
+  ]
+  if not candidates:
+    await message.answer("Нет других администраторов для снятия прав.")
+    return
+
+  await message.answer(
+    "👤 Выберите администратора для снятия прав:",
+    reply_markup=users_picker_keyboard(candidates[:30], "drop"),
+  )
 
 
-@router.message(AdminStates.drop_admin_id)
-async def process_drop_admin(message: Message, state: FSMContext):
-  user_id = int(message.text)
-  await set_admin(user_id, False)
-  await state.clear()
-  await message.answer(f"✅ Права администратора сняты с {user_id}.")
+@router.callback_query(F.data.startswith("admin_user:"))
+async def process_admin_user_pick(callback: CallbackQuery, is_admin: bool):
+  if not is_admin:
+    await callback.answer("⛔ Только для администраторов.", show_alert=True)
+    return
+
+  parts = callback.data.split(":")
+  if len(parts) != 3:
+    await callback.answer()
+    return
+
+  action = parts[1]
+  if action == "cancel":
+    await callback.message.edit_text("❌ Действие отменено.")
+    await callback.answer()
+    return
+
+  user_id = int(parts[2])
+
+  if action == "create":
+    await create_user(user_id, None, is_admin=True)
+    await set_admin(user_id, True)
+    await callback.message.edit_text(f"✅ Пользователь {user_id} назначен администратором.")
+  elif action == "drop":
+    await set_admin(user_id, False)
+    await callback.message.edit_text(f"✅ Права администратора сняты с {user_id}.")
+  else:
+    await callback.answer()
+    return
+
+  await callback.answer()
 
 
 @router.message(Command("stats"))

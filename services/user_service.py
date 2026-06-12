@@ -27,23 +27,20 @@ async def set_admin(user_id, is_admin):
     await db.commit()
 
 
-async def save_preferences(user_id, genres, mood, rating_pref, book_length, interests):
+async def save_preferences(user_id, genres):
   genres_str = ",".join(genres)
-  interests_str = ",".join(interests)
 
   async with get_db() as db:
     await db.execute(
       """
       INSERT INTO user_preferences (user_id, genres, mood, rating_pref, book_length, interests)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, '', 'any', 'any', '')
       ON CONFLICT(user_id) DO UPDATE SET
         genres = excluded.genres,
-        mood = excluded.mood,
-        rating_pref = excluded.rating_pref,
-        book_length = excluded.book_length,
-        interests = excluded.interests
+        mood = '',
+        interests = ''
       """,
-      (user_id, genres_str, mood, rating_pref, book_length, interests_str),
+      (user_id, genres_str),
     )
     await db.commit()
 

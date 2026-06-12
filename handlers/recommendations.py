@@ -16,16 +16,27 @@ async def send_recommendations(message: Message, user_id: int, random_mode=False
   if not recommendations:
     if random_mode:
       await message.answer("😔 В базе пока нет книг.")
+    elif preferences and preferences.get("genres"):
+      genres = ", ".join(preferences["genres"])
+      await message.answer(f"😔 По жанрам «{genres}» книг в базе пока нет.")
     else:
       await message.answer(
         "😔 Не удалось подобрать книги. Пройдите опрос через /start"
       )
     return
 
-  await message.answer("🎯 <b>Ваши рекомендации:</b>")
+  mode = recommendations[0].get("mode", "combined")
+  if mode == "per_genre":
+    await message.answer(
+      "🎯 <b>Точных совпадений не нашлось — подборка отдельно по каждому жанру:</b>"
+    )
+  else:
+    await message.answer("🎯 <b>Ваши рекомендации (топ-3):</b>")
 
   for index, item in enumerate(recommendations, start=1):
     text = format_book_recommendation(index, item["book"], item["reason"])
+    if mode == "per_genre" and item.get("genre"):
+      text = f"📂 <b>Жанр: {item['genre']}</b>\n\n{text}"
     await message.answer(text)
 
 

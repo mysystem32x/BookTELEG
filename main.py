@@ -11,6 +11,7 @@ from database import init_db
 from handlers import setup_routers
 from middlewares import AdminMiddleware, ErrorMiddleware
 from services.book_service import seed_books_from_dataset
+from services.genre_service import get_genres
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,6 +23,11 @@ async def main():
     return
 
   await init_db()
+  genres = get_genres()
+  if genres:
+    logger.info("Загружено %s жанров из датасета", len(genres))
+  else:
+    logger.warning("Жанры из датасета не найдены — проверьте dataset/books.xlsx")
   await seed_books_from_dataset()
 
   bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))

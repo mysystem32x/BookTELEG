@@ -2,7 +2,8 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from config import GENRES, INTERESTS, MOODS
+from config import INTERESTS, MOODS
+from services.genre_service import get_genres
 
 GENRE_KEYWORDS = {
   "Фантастика": ["фантастик", "sci-fi"],
@@ -128,13 +129,13 @@ def _parse_rating(value):
 
 def _normalize_genre(genre_raw):
   lower = genre_raw.lower()
-  for genre in GENRES:
+  for genre in get_genres():
     if genre.lower() in lower:
       return genre
   for genre, keywords in GENRE_KEYWORDS.items():
     if any(keyword in lower for keyword in keywords):
       return genre
-  return "Классика"
+  return genre_raw.strip() or "Классика"
 
 
 def _extract_interests(genre_raw):
